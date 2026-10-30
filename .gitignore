@@ -4,3 +4,4 @@ vendor
 *~
 tests/reports/
 tests/.env.test
+php_errorlog
