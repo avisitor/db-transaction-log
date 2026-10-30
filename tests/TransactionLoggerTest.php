@@ -96,6 +96,7 @@ class TransactionLoggerTest extends TestCase
 
     public function testLogStoresErrorStatusAndMessage(): void
     {
+        $sqls = [];
         $valuesList = [];
         $logger = $this->makeLogger($this->mockPdo($sqls, $valuesList));
         $logger->log('PlantOrder', 'placeOrder', ['eventid' => 'e1'], 'error', 'duplicate key');
@@ -122,6 +123,7 @@ class TransactionLoggerTest extends TestCase
 
     public function testLogCallerExtractsClassTokenAndOperationFromBacktrace(): void
     {
+        $sqls = [];
         $valuesList = [];
         $logger = $this->makeLogger($this->mockPdo($sqls, $valuesList));
         $dao = new FakeDaoForLogCaller($logger);
@@ -134,6 +136,7 @@ class TransactionLoggerTest extends TestCase
 
     public function testLogCallerStripsLeadingDbPrefixFromClassToken(): void
     {
+        $sqls = [];
         $valuesList = [];
         $logger = $this->makeLogger($this->mockPdo($sqls, $valuesList));
         $dao = new class($logger) {
