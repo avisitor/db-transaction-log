@@ -17,13 +17,17 @@ final class TransactionLogStore
 {
     use ResolvesConnection;
 
-    private ?PDO $pdo;
     private string $table;
 
     public function __construct(array $config = [])
     {
         $this->table = $this->resolveTable($config);
-        $this->pdo = $this->resolveConnection($config);
+        $this->setConnectionConfig($config);
+    }
+
+    private function pdo(): ?PDO
+    {
+        return $this->connection();
     }
 
     /**
@@ -49,11 +53,12 @@ final class TransactionLogStore
         $totalMatching = $where === '' ? $totalEntries : $this->countWhere($where, $values);
 
         $entries = [];
-        if ($this->pdo !== null) {
+        $pdo = $this->pdo();
+        if ($pdo !== null) {
             $sql = 'SELECT * FROM `' . $this->table . '`'
                 . ($where !== '' ? " WHERE $where" : '')
                 . ' ORDER BY id DESC LIMIT :__limit OFFSET :__offset';
-            $stmt = $this->pdo->prepare($sql);
+            $stmt = $pdo->prepare($sql);
             foreach ($values as $key => $value) {
                 $stmt->bindValue($key, $value);
             }
@@ -78,10 +83,11 @@ final class TransactionLogStore
 
     public function getById(int $id): ?TransactionLogEntry
     {
-        if ($this->pdo === null) {
+        $pdo = $this->pdo();
+        if ($pdo === null) {
             return null;
         }
-        $stmt = $this->pdo->prepare('SELECT * FROM `' . $this->table . '` WHERE `id` = :id');
+        $stmt = $pdo->prepare('SELECT * FROM `' . $this->table . '` WHERE `id` = :id');
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : TransactionLogEntry::fromRow($row);
@@ -89,10 +95,11 @@ final class TransactionLogStore
 
     public function countAll(): int
     {
-        if ($this->pdo === null) {
+        $pdo = $this->pdo();
+        if ($pdo === null) {
             return 0;
         }
-        $stmt = $this->pdo->query('SELECT COUNT(*) c FROM `' . $this->table . '`');
+        $stmt = $pdo->query('SELECT COUNT(*) c FROM `' . $this->table . '`');
         return (int)$stmt->fetchColumn();
     }
 
@@ -160,10 +167,11 @@ final class TransactionLogStore
 
     private function countWhere(string $where, array $values): int
     {
-        if ($this->pdo === null) {
+        $pdo = $this->pdo();
+        if ($pdo === null) {
             return 0;
         }
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) c FROM `' . $this->table . "` WHERE $where");
+        $stmt = $pdo->prepare('SELECT COUNT(*) c FROM `' . $this->table . "` WHERE $where");
         $stmt->execute($values);
         return (int)$stmt->fetchColumn();
     }
@@ -173,10 +181,11 @@ final class TransactionLogStore
      */
     private function distinctColumn(string $column): array
     {
-        if ($this->pdo === null) {
+        $pdo = $this->pdo();
+        if ($pdo === null) {
             return [];
         }
-        $stmt = $this->pdo->query('SELECT DISTINCT `' . $column . '` FROM `' . $this->table . '` ORDER BY `' . $column . '`');
+        $stmt = $pdo->query('SELECT DISTINCT `' . $column . '` FROM `' . $this->table . '` ORDER BY `' . $column . '`');
         return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
     }
 }

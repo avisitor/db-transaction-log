@@ -14,17 +14,42 @@ use PDO;
  */
 trait ResolvesConnection
 {
+    /** @var array config used for lazy per-call connection resolution */
+    private array $connConfig = [];
+
+    protected function setConnectionConfig(array $config): void
+    {
+        $this->connConfig = $config;
+    }
+
+    /**
+     * Resolve the connection on every call (not once in the constructor) so a
+     * connection that becomes available later in the process is still used.
+     */
+    protected function connection(): ?PDO
+    {
+        return $this->resolveConnection($this->connConfig);
+    }
+
     protected function resolveConnection(array $config): ?PDO
     {
         if (isset($config['pdo']) && $config['pdo'] instanceof PDO) {
             return $config['pdo'];
         }
         if (isset($config['pdoProvider']) && is_callable($config['pdoProvider'])) {
-            $pdo = ($config['pdoProvider'])();
+            try {
+                $pdo = ($config['pdoProvider'])();
+            } catch (\Throwable $e) {
+                return null;
+            }
             return $pdo instanceof PDO ? $pdo : null;
         }
         if (class_exists(\Common\DB\DBBase::class)) {
-            $pdo = \Common\DB\DBBase::getDefaultConnection();
+            try {
+                $pdo = \Common\DB\DBBase::getDefaultConnection();
+            } catch (\Throwable $e) {
+                return null;
+            }
             return $pdo instanceof PDO ? $pdo : null;
         }
         return null;

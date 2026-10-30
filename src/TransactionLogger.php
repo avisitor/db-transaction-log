@@ -36,7 +36,6 @@ final class TransactionLogger
     private array $config;
     private bool $enabled;
     private string $table;
-    private ?PDO $pdo;
     private int $retentionDays;
     private float $pruneProbability;
     /** @var array<string, \PDOStatement> prepared-statement cache keyed by column list */
@@ -47,7 +46,7 @@ final class TransactionLogger
         $this->config = $config;
         $this->enabled = (bool)($config['enabled'] ?? false);
         $this->table = $this->resolveTable($config);
-        $this->pdo = $this->resolveConnection($config);
+        $this->setConnectionConfig($config);
         $this->retentionDays = (int)($config['retentionDays'] ?? 365);
         $this->pruneProbability = (float)($config['pruneProbability'] ?? 0.01);
     }
@@ -79,35 +78,44 @@ final class TransactionLogger
 
     public function getConnection(): ?PDO
     {
-        return $this->pdo;
+        return $this->connection();
     }
 
     /**
      * Record one transaction. $params is stored as var_export() text verbatim
-     * so replays see exactly what was logged.
+     * so replays see exactly what was logged. Never throws: any failure
+     * (including throwing config callables) goes to error_log().
      */
     public function log(string $classToken, string $operation, mixed $params, string $status = 'ok', string $error = ''): void
     {
-        if (!$this->enabled || $this->pdo === null) {
+        if (!$this->enabled) {
             return;
         }
-        $paramsText = var_export($params, true);
-        $email = '';
-        if (preg_match('/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/', $paramsText, $m)) {
-            $email = $m[0];
+        try {
+            $pdo = $this->connection();
+            if ($pdo === null) {
+                return;
+            }
+            $paramsText = var_export($params, true);
+            $email = '';
+            if (preg_match('/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/', $paramsText, $m)) {
+                $email = $m[0];
+            }
+            $this->insertRow([
+                'ts' => (string)$this->callConfig($this->config, 'now', date('Y-m-d H:i:s')),
+                'username' => (string)$this->callConfig($this->config, 'username', ''),
+                'class' => $classToken,
+                'operation' => $operation,
+                'email' => $email,
+                'status' => $status,
+                'error' => $error,
+                'params' => $paramsText,
+                'request' => (string)$this->callConfig($this->config, 'request', $_SERVER['SCRIPT_NAME'] ?? ''),
+            ]);
+            $this->maybePrune();
+        } catch (\Throwable $e) {
+            error_log('db-transaction-log: log failed: ' . $e->getMessage());
         }
-        $this->insertRow([
-            'ts' => (string)$this->callConfig($this->config, 'now', date('Y-m-d H:i:s')),
-            'username' => (string)$this->callConfig($this->config, 'username', ''),
-            'class' => $classToken,
-            'operation' => $operation,
-            'email' => $email,
-            'status' => $status,
-            'error' => $error,
-            'params' => $paramsText,
-            'request' => (string)$this->callConfig($this->config, 'request', $_SERVER['SCRIPT_NAME'] ?? ''),
-        ]);
-        $this->maybePrune();
     }
 
     /**
@@ -137,7 +145,8 @@ final class TransactionLogger
      */
     public function insertRow(array $row): ?int
     {
-        if ($this->pdo === null) {
+        $pdo = $this->connection();
+        if ($pdo === null) {
             return null;
         }
         try {
@@ -153,14 +162,14 @@ final class TransactionLogger
             foreach ($fields as $col) {
                 $values[':' . $col] = $row[$col];
             }
-            $cacheKey = implode(',', $fields);
+            $cacheKey = spl_object_id($pdo) . ':' . implode(',', $fields);
             $stmt = $this->stmtCache[$cacheKey] ?? null;
             if ($stmt === null) {
-                $stmt = $this->pdo->prepare($sql);
+                $stmt = $pdo->prepare($sql);
                 $this->stmtCache[$cacheKey] = $stmt;
             }
             $stmt->execute($values);
-            $id = $this->pdo->lastInsertId();
+            $id = $pdo->lastInsertId();
             return $id === false || $id === null ? null : (int)$id;
         } catch (\Throwable $e) {
             error_log('db-transaction-log: insert failed: ' . $e->getMessage());
@@ -174,14 +183,15 @@ final class TransactionLogger
      */
     public function deleteOlderThan(?int $days = null): int
     {
-        if ($this->pdo === null) {
+        $pdo = $this->connection();
+        if ($pdo === null) {
             return 0;
         }
         $days = $days ?? $this->retentionDays;
         try {
             $now = (string)$this->callConfig($this->config, 'now', date('Y-m-d H:i:s'));
             $cutoff = date('Y-m-d H:i:s', strtotime('-' . max(0, $days) . ' days', strtotime($now)));
-            $stmt = $this->pdo->prepare('DELETE FROM `' . $this->table . '` WHERE `ts` < :cutoff');
+            $stmt = $pdo->prepare('DELETE FROM `' . $this->table . '` WHERE `ts` < :cutoff');
             $stmt->execute([':cutoff' => $cutoff]);
             return $stmt->rowCount();
         } catch (\Throwable $e) {

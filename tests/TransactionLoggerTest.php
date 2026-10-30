@@ -220,6 +220,45 @@ class TransactionLoggerTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         new TransactionLogger(['enabled' => true, 'table' => 'transactions; DROP TABLE users', 'pdo' => $this->mockPdo()]);
     }
+
+    public function testLogNeverThrowsEvenWhenConfigCallablesThrow(): void
+    {
+        $sqls = [];
+        $valuesList = [];
+        $logger = $this->makeLogger($this->mockPdo($sqls, $valuesList), [
+            'now' => function () { throw new \RuntimeException('bad timezone'); },
+        ]);
+
+        $logger->log('Site', 'update', ['a' => 1], 'ok'); // must not throw
+
+        $this->assertSame([], $sqls); // nothing inserted, but no exception escaped
+    }
+
+    public function testConnectionIsResolvedLazilyPerCall(): void
+    {
+        $sqls = [];
+        $valuesList = [];
+        $calls = 0;
+        $pdo = $this->mockPdo($sqls, $valuesList);
+        // First resolution returns null (connection not yet set up), second returns the pdo
+        $logger = new TransactionLogger([
+            'enabled' => true,
+            'table' => 'transactions',
+            'pdoProvider' => function () use (&$calls, $pdo) {
+                $calls++;
+                return $calls >= 2 ? $pdo : null;
+            },
+            'now' => fn() => '2026-10-30 12:00:00',
+            'pruneProbability' => 0.0,
+        ]);
+
+        $logger->log('Site', 'update', ['a' => 1]); // no connection yet -> no-op
+        $this->assertSame([], $sqls);
+        $logger->log('Site', 'update', ['a' => 2]); // connection now available -> insert
+        $this->assertCount(1, $sqls);
+        [, $values] = $valuesList[0];
+        $this->assertSame(var_export(['a' => 2], true), $values[':params']);
+    }
 }
 
 class DBNamedDao
