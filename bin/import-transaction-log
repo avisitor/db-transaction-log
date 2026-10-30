@@ -1,0 +1,103 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * One-time import of a legacy transactions.log file into the DB table.
+ *
+ * Usage:
+ *   vendor/bin/import-transaction-log --file=/path/transactions.log [options]
+ *
+ * Options:
+ *   --file=PATH      legacy log file (required)
+ *   --host=H         DB host (or DB_HOST env; default localhost)
+ *   --socket=PATH    unix socket (or DB_SOCKET env)
+ *   --port=N         DB port (or DB_PORT env; default 3306)
+ *   --dbname=NAME    database (or DB_DATABASE env; required)
+ *   --user=U         DB user (or DB_USERNAME env; required)
+ *   --pass=P         DB password (or DB_PASSWORD env)
+ *   --table=NAME     target table (default 'transactions')
+ *   --batch=N        rows per progress tick (default 500)
+ *   --dry-run        only count entries in the file, write nothing
+ *   --help
+ *
+ * The table must already exist (apply schema/transactions.sql to your DB).
+ */
+
+foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'] as $autoload) {
+    if (file_exists($autoload)) {
+        require $autoload;
+        break;
+    }
+}
+
+use DbTransactionLog\FileLogImporter;
+use DbTransactionLog\Import\FileLogScanner;
+use DbTransactionLog\TransactionLogger;
+
+$opts = getopt('', ['file:', 'host:', 'socket:', 'port:', 'dbname:', 'user:', 'pass:', 'table:', 'batch:', 'dry-run', 'help']);
+
+if (isset($opts['help']) || !isset($opts['file'])) {
+    echo "Usage: import-transaction-log --file=PATH [--host --socket --port --dbname --user --pass] [--table=transactions] [--batch=500] [--dry-run]\n";
+    exit(isset($opts['help']) ? 0 : 1);
+}
+
+$file = (string)$opts['file'];
+if (!is_file($file)) {
+    fwrite(STDERR, "File not found: $file\n");
+    exit(1);
+}
+
+$scanner = new FileLogScanner($file);
+$total = $scanner->countEntries();
+echo "Scanning $file: $total entries found\n";
+
+if (isset($opts['dry-run'])) {
+    echo "Dry run — nothing written.\n";
+    exit(0);
+}
+
+$host = (string)($opts['host'] ?? getenv('DB_HOST') ?: 'localhost');
+$socket = (string)($opts['socket'] ?? getenv('DB_SOCKET') ?: '');
+$port = (string)($opts['port'] ?? getenv('DB_PORT') ?: '3306');
+$dbname = (string)($opts['dbname'] ?? getenv('DB_DATABASE') ?: '');
+$user = (string)($opts['user'] ?? getenv('DB_USERNAME') ?: '');
+$pass = (string)($opts['pass'] ?? getenv('DB_PASSWORD') ?: '');
+if ($dbname === '' || $user === '') {
+    fwrite(STDERR, "Missing DB credentials: pass --dbname/--user/--pass or set DB_DATABASE/DB_USERNAME/DB_PASSWORD\n");
+    exit(1);
+}
+
+$dsn = 'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $dbname . ';charset=utf8mb4';
+if ($socket !== '') {
+    $dsn = 'mysql:unix_socket=' . $socket . ';dbname=' . $dbname . ';charset=utf8mb4';
+}
+try {
+    $pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+} catch (Throwable $e) {
+    fwrite(STDERR, 'Connection failed: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
+$table = (string)($opts['table'] ?? 'transactions');
+$batch = max(1, (int)($opts['batch'] ?? 500));
+
+$logger = new TransactionLogger([
+    'enabled' => true,
+    'table' => $table,
+    'pdo' => $pdo,
+    'pruneProbability' => 0.0, // retention pruning is a separate concern (bin/prune-transactions)
+]);
+
+$importer = new FileLogImporter($logger);
+$imported = $importer->importFile($file, $batch, function (int $n) {
+    echo "  imported $n\n";
+});
+
+echo "Imported $imported rows into `$table`\n";
+if ($imported !== $total) {
+    fwrite(STDERR, "WARNING: row count mismatch — file had $total entries, inserted $imported\n");
+    exit(2);
+}
+exit(0);

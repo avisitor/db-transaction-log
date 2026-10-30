@@ -1,0 +1,23 @@
+// 2025-11-02 19:31:49 robw
+$s = new Site();
+$s->update([
+  'sitename' => 'Test',
+  'owneremail' => 'test@example.com',
+  'recurring_weekdays' =>
+  [
+    0 => '0',
+    1 => '6',
+  ],
+]);
+// 2026-10-30 08:00:00 admin
+$s = new DBPlantOrder();
+$s->DBPlantOrderplaceOrder([
+  'eventid' => 'e1',
+  'note' => 'a) b',
+]);
+// 2026-10-30 08:01:00
+$s = new RecurringEvent();
+$s->update(array (
+  'eventid' => 'e2',
+  'frequency' => 'weekly',
+));

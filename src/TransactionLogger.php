@@ -39,6 +39,8 @@ final class TransactionLogger
     private ?PDO $pdo;
     private int $retentionDays;
     private float $pruneProbability;
+    /** @var array<string, \PDOStatement> prepared-statement cache keyed by column list */
+    private array $stmtCache = [];
 
     public function __construct(array $config = [])
     {
@@ -151,7 +153,12 @@ final class TransactionLogger
             foreach ($fields as $col) {
                 $values[':' . $col] = $row[$col];
             }
-            $stmt = $this->pdo->prepare($sql);
+            $cacheKey = implode(',', $fields);
+            $stmt = $this->stmtCache[$cacheKey] ?? null;
+            if ($stmt === null) {
+                $stmt = $this->pdo->prepare($sql);
+                $this->stmtCache[$cacheKey] = $stmt;
+            }
             $stmt->execute($values);
             $id = $this->pdo->lastInsertId();
             return $id === false || $id === null ? null : (int)$id;

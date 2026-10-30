@@ -1,0 +1,65 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Retention prune for the transactions table. Intended for cron, e.g.:
+ *   17 3 * * * php /path/to/vendor/bin/prune-transactions --dbname=... --user=... --pass=...
+ *
+ * Usage:
+ *   vendor/bin/prune-transactions [--days=N] [--host --socket --port --dbname --user --pass] [--table=transactions]
+ *
+ * Defaults: --days comes from TRANSACTION_LOG_RETENTION_DAYS env or 365.
+ */
+
+foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'] as $autoload) {
+    if (file_exists($autoload)) {
+        require $autoload;
+        break;
+    }
+}
+
+use DbTransactionLog\TransactionLogger;
+
+$opts = getopt('', ['days:', 'host:', 'socket:', 'port:', 'dbname:', 'user:', 'pass:', 'table:', 'help']);
+
+if (isset($opts['help'])) {
+    echo "Usage: prune-transactions [--days=N] [--host --socket --port --dbname --user --pass] [--table=transactions]\n";
+    exit(0);
+}
+
+$host = (string)($opts['host'] ?? getenv('DB_HOST') ?: 'localhost');
+$socket = (string)($opts['socket'] ?? getenv('DB_SOCKET') ?: '');
+$port = (string)($opts['port'] ?? getenv('DB_PORT') ?: '3306');
+$dbname = (string)($opts['dbname'] ?? getenv('DB_DATABASE') ?: '');
+$user = (string)($opts['user'] ?? getenv('DB_USERNAME') ?: '');
+$pass = (string)($opts['pass'] ?? getenv('DB_PASSWORD') ?: '');
+$days = isset($opts['days']) ? (int)$opts['days'] : (int)(getenv('TRANSACTION_LOG_RETENTION_DAYS') ?: 365);
+
+if ($dbname === '' || $user === '') {
+    fwrite(STDERR, "Missing DB credentials: pass --dbname/--user/--pass or set DB_DATABASE/DB_USERNAME/DB_PASSWORD\n");
+    exit(1);
+}
+
+$dsn = 'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $dbname . ';charset=utf8mb4';
+if ($socket !== '') {
+    $dsn = 'mysql:unix_socket=' . $socket . ';dbname=' . $dbname . ';charset=utf8mb4';
+}
+try {
+    $pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+} catch (Throwable $e) {
+    fwrite(STDERR, 'Connection failed: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
+$logger = new TransactionLogger([
+    'enabled' => true,
+    'table' => (string)($opts['table'] ?? 'transactions'),
+    'pdo' => $pdo,
+    'retentionDays' => $days,
+]);
+
+$deleted = $logger->deleteOlderThan($days);
+echo "Deleted $deleted transaction rows older than $days days\n";
+exit(0);
