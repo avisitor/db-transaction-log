@@ -26,6 +26,11 @@
         "bin/import-transaction-log",
         "bin/prune-transactions"
     ],
+    "extra": {
+        "views": {
+            "transaction-log-viewer": "views/transaction-log.php"
+        }
+    },
     "scripts": {
         "test": "phpunit"
     },
