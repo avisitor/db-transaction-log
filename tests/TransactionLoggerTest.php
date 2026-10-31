@@ -234,6 +234,29 @@ class TransactionLoggerTest extends TestCase
         $this->assertSame([], $sqls); // nothing inserted, but no exception escaped
     }
 
+    public function testOverLongColumnValuesAreTruncatedToSchemaLimits(): void
+    {
+        $sqls = [];
+        $valuesList = [];
+        $logger = $this->makeLogger($this->mockPdo($sqls, $valuesList), [
+            'username' => fn() => str_repeat('u', 200),
+            'request' => fn() => str_repeat('r', 500),
+        ]);
+
+        $longEmail = str_repeat('a', 120) . '@' . str_repeat('b', 120) . '.com';
+        $logger->log(str_repeat('C', 100), str_repeat('o', 100), ['email' => $longEmail], str_repeat('s', 30), str_repeat('e', 70000));
+
+        $this->assertCount(1, $sqls);
+        [, $values] = $valuesList[0];
+        $this->assertLessThanOrEqual(64, strlen($values[':username']));
+        $this->assertLessThanOrEqual(255, strlen($values[':request']));
+        $this->assertLessThanOrEqual(64, strlen($values[':class']));
+        $this->assertLessThanOrEqual(64, strlen($values[':operation']));
+        $this->assertLessThanOrEqual(128, strlen($values[':email']));
+        $this->assertLessThanOrEqual(16, strlen($values[':status']));
+        $this->assertLessThanOrEqual(65535, strlen($values[':error']));
+    }
+
     public function testConnectionIsResolvedLazilyPerCall(): void
     {
         $sqls = [];

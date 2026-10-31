@@ -101,16 +101,18 @@ final class TransactionLogger
             if (preg_match('/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/', $paramsText, $m)) {
                 $email = $m[0];
             }
+            // Truncate to the schema's column limits so a STRICT_TRANS_TABLES
+            // insert can never fail (and the row be lost) over an over-long value.
             $this->insertRow([
                 'ts' => (string)$this->callConfig($this->config, 'now', date('Y-m-d H:i:s')),
-                'username' => (string)$this->callConfig($this->config, 'username', ''),
-                'class' => $classToken,
-                'operation' => $operation,
-                'email' => $email,
-                'status' => $status,
-                'error' => $error,
+                'username' => mb_substr((string)$this->callConfig($this->config, 'username', ''), 0, 64, 'UTF-8'),
+                'class' => mb_substr($classToken, 0, 64, 'UTF-8'),
+                'operation' => mb_substr($operation, 0, 64, 'UTF-8'),
+                'email' => mb_substr($email, 0, 128, 'UTF-8'),
+                'status' => mb_substr($status, 0, 16, 'UTF-8'),
+                'error' => mb_substr($error, 0, 65535, 'UTF-8'),
                 'params' => $paramsText,
-                'request' => (string)$this->callConfig($this->config, 'request', $_SERVER['SCRIPT_NAME'] ?? ''),
+                'request' => mb_substr((string)$this->callConfig($this->config, 'request', $_SERVER['SCRIPT_NAME'] ?? ''), 0, 255, 'UTF-8'),
             ]);
             $this->maybePrune();
         } catch (\Throwable $e) {
