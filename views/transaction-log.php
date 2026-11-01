@@ -309,12 +309,29 @@ $operations = $scan->distinctOperations;
     $shown = count($entries);
     ?>
     <p class="text-muted">showing <span id="txlog-shown"><?= $shown ?></span> of <?= $Z ?></p>
+    <style>
+    /* Keep long entry payloads (var_export blobs) from widening the page. */
+    #txlog-table {
+        max-width: 100%;
+        table-layout: auto;
+    }
+    #txlog-table td,
+    #txlog-table th {
+        vertical-align: top;
+    }
+    #txlog-table details pre {
+        max-width: 48em;
+        margin: .5em 0 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    </style>
     <div id="txlog-scroll-status" class="text-muted my-2">
         <span class="infinite-scroll-request" style="display:none;">Loading…</span>
         <span class="infinite-scroll-last" style="display:none;">— end of log —</span>
     </div>
-    <table class="table table-bordered table-sm" id="txlog-table" data-total="<?= $Z ?>" data-page-size="<?= $pageSize ?>">
-        <thead>
+    <table class="table table-bordered table-sm" id="txlog-table" data-total="<?= $Z ?>" data-page-size="<?= $pageSize ?>">        <thead>
             <tr>
                 <th>Timestamp</th>
                 <th>User</th>
