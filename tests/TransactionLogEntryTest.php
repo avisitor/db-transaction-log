@@ -55,7 +55,7 @@ class TransactionLogEntryTest extends TestCase
 
         $this->assertStringContainsString('// 2026-10-30 01:02:03 robw', $raw);
         $this->assertStringContainsString('$s = new PlantOrder();', $raw);
-        $this->assertStringContainsString('$s->PlantOrderplaceOrder(', $raw);
+        $this->assertStringContainsString('$s->placeOrder(', $raw);
         $this->assertStringContainsString("'eventid' => 'e1'", $raw);
     }
 

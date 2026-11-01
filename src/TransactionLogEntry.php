@@ -47,13 +47,12 @@ final class TransactionLogEntry
      */
     public function raw(): string
     {
-        $callToken = $this->classToken !== ''
-            ? $this->classToken . $this->operation
-            : $this->operation;
-
-        return '// ' . $this->ts . ($this->username !== '' ? ' ' . $this->username : '') . "\n"
-            . '$s = new ' . $this->classToken . "();\n"
-            . '$s->' . $callToken . '(' . $this->params . ");\n";
+        $out = '// ' . $this->ts . ($this->username !== '' ? ' ' . $this->username : '') . "\n";
+        if ($this->classToken !== '') {
+            $out .= '$s = new ' . $this->classToken . "();\n";
+        }
+        $out .= '$s->' . $this->operation . '(' . $this->params . ");\n";
+        return $out;
     }
 
     /**
