@@ -18,6 +18,10 @@ declare(strict_types=1);
  * - statusOptionText: text for status options (default: ['ok', 'error'])
  * - operationsWhitelist: allowed operations for replay (default: [])
  * - pageJs: additional JS to include (optional)
+ * - replayerFactory: callable() that returns a TransactionLogReplayer instance
+ *   (default: new \DbTransactionLog\TransactionLogReplayer()). Apps that need
+ *   custom class resolution or allowed operations should provide a subclass
+ *   here instead of duplicating replay logic.
  */
 
 // Config with defaults
@@ -33,6 +37,7 @@ $config = array_merge([
     'statusOptions' => ['ok', 'error'],
     'operationsWhitelist' => [],
     'pageJs' => '',
+    'replayerFactory' => fn() => new \DbTransactionLog\TransactionLogReplayer(),
 ], $config);
 
 // Run admin check
@@ -109,7 +114,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
                 }
 
                 if ($replayError === null) {
-                    $replayer = new \DbTransactionLog\TransactionLogReplayer();
+                    $replayer = $config['replayerFactory']();
                     $replayResult = $replayer->replay($entry->classToken, $entry->operation, $params);
                 }
             }

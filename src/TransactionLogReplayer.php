@@ -17,10 +17,11 @@ class TransactionLogReplayer
     /**
      * Only recorded write operations may be replayed — not arbitrary public
      * DBBase methods. Override in subclasses to add app-specific operations.
+     * Default contains 'update' which is the most common write operation.
      *
      * @var string[]
      */
-    public static array $allowedOperations = [];
+    public static array $allowedOperations = ['update', 'signup', 'placeOrder', 'changeDate'];
 
     /**
      * Replay a logged transaction.
@@ -69,7 +70,7 @@ class TransactionLogReplayer
             );
         }
 
-        if (!in_array($operation, self::$allowedOperations, true)) {
+        if (!in_array($operation, static::$allowedOperations, true)) {
             return new TransactionLogReplayResult(
                 false,
                 $classToken,
