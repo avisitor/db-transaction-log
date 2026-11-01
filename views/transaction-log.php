@@ -86,6 +86,14 @@ $nonce = $_SESSION['txlog_nonce'];
 // Query
 $scanError = null;
 try {
+    // A missing connection must never look like an empty log. The provider is
+    // the app's only way to supply PDO, so surface a null result loudly.
+    if (($config['pdoProvider'])() === null) {
+        throw new \RuntimeException(
+            'no database connection available for the transaction log'
+        );
+    }
+
     $scan = $store->query(
         $op !== '' ? $op : null,
         $email !== '' ? $email : null,
