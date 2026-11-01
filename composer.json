@@ -1,7 +1,7 @@
 {
     "name": "avisitor/db-transaction-log",
     "description": "DB-backed transaction log for avisitor/dbbase apps: writer with result codes, query store, retention, and a legacy file importer",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "type": "library",
     "license": "MIT",
     "autoload": {
