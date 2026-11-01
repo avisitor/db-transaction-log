@@ -128,7 +128,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
 $renderRow = function (\DbTransactionLog\TransactionLogEntry $entry) use ($operationsWhitelist): string {
     ob_start();
     ?>
-    <tr data-id="<?= htmlspecialchars($entry->id, ENT_QUOTES, 'UTF-8') ?>">
+    <tr data-id="<?= htmlspecialchars((string)$entry->id, ENT_QUOTES, 'UTF-8') ?>">
         <td><?= htmlspecialchars($entry->ts, ENT_QUOTES, 'UTF-8') ?></td>
         <td><?= htmlspecialchars($entry->username, ENT_QUOTES, 'UTF-8') ?></td>
         <td><?= htmlspecialchars($entry->classToken, ENT_QUOTES, 'UTF-8') ?></td>
@@ -155,7 +155,7 @@ $renderRow = function (\DbTransactionLog\TransactionLogEntry $entry) use ($opera
                 <button type="button" class="replay-btn btn btn-outline-secondary btn-sm"
                         data-class="<?= htmlspecialchars($entry->classToken, ENT_QUOTES, 'UTF-8') ?>"
                         data-op="<?= htmlspecialchars($entry->operation, ENT_QUOTES, 'UTF-8') ?>"
-                        data-id="<?= htmlspecialchars($entry->id, ENT_QUOTES, 'UTF-8') ?>">
+                        data-id="<?= htmlspecialchars((string)$entry->id, ENT_QUOTES, 'UTF-8') ?>">
                     Replay
                 </button>
             <?php else: ?>
