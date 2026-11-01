@@ -13,6 +13,8 @@ declare(strict_types=1);
  * - pageSize: results per page (default: 200)
  * - adminCheck: callable() that returns true if user is admin (default: requireAdmin())
  * - bannerInclude: path to banner HTML include (optional)
+ * - footerInclude: path to footer HTML include, rendered just before
+ *   </body> (optional). Apps use this for a shared nav menu/footer.
  * - returnUrl: URL to return button link (default: 'index.php')
  * - pageName: page title (default: 'Transaction Log')
  * - statusOptionText: text for status options (default: ['ok', 'error'])
@@ -32,6 +34,7 @@ $config = array_merge([
     'pageSize' => 200,
     'adminCheck' => fn() => (function_exists('requireAdmin') ? requireAdmin() : true),
     'bannerInclude' => null,
+    'footerInclude' => null,
     'returnUrl' => 'index.php',
     'pageName' => 'Transaction Log',
     'statusOptions' => ['ok', 'error'],
@@ -408,5 +411,8 @@ $operations = $scan->distinctOperations;
         }
     })();
     </script>
+    <?php if ($config['footerInclude'] && file_exists($config['footerInclude'])): ?>
+        <?php include $config['footerInclude']; ?>
+    <?php endif; ?>
 </body>
 </html>
