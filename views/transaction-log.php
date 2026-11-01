@@ -17,6 +17,11 @@ declare(strict_types=1);
  *   </body> (optional). Apps use this for a shared nav menu/footer.
  * - returnUrl: URL to return button link (default: 'index.php')
  * - pageName: page title (default: 'Transaction Log')
+ * - pageHeading: optional app/site heading rendered as <h1> above the page
+ *   title (e.g. the organisation name). Rendered escaped.
+ * - bodyClass: optional class attribute for <body> (default: '')
+ * - contentClass: optional class for the main content wrapper (default:
+ *   'wholepage')
  * - statusOptionText: text for status options (default: ['ok', 'error'])
  * - operationsWhitelist: allowed operations for replay (default: [])
  * - pageJs: additional JS to include (optional)
@@ -37,6 +42,9 @@ $config = array_merge([
     'footerInclude' => null,
     'returnUrl' => 'index.php',
     'pageName' => 'Transaction Log',
+    'pageHeading' => '',
+    'bodyClass' => '',
+    'contentClass' => 'wholepage',
     'statusOptions' => ['ok', 'error'],
     'operationsWhitelist' => [],
     'pageJs' => '',
@@ -191,18 +199,23 @@ $operations = $scan->distinctOperations;
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <?php if (empty($htmlheader)): ?>
     <title><?= htmlspecialchars($config['pageName'] ?? 'Transaction Log', ENT_QUOTES, 'UTF-8') ?></title>
+    <?php endif; ?>
     <?= $htmlheader ?? '' ?>
     <script src="js/infinite-query.js"></script>
     <?php if (isset($config['pageJs']) && $config['pageJs']): ?>
         <?= $config['pageJs'] ?>
     <?php endif; ?>
 </head>
-<body>
+<body<?= ($config['bodyClass'] ?? '') !== '' ? ' class="' . htmlspecialchars($config['bodyClass'], ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
     <?php if ($config['bannerInclude'] && file_exists($config['bannerInclude'])): ?>
         <?php include $config['bannerInclude']; ?>
     <?php endif; ?>
-    <div class="wholepage">
+    <div class="<?= htmlspecialchars($config['contentClass'] ?: 'wholepage', ENT_QUOTES, 'UTF-8') ?>">
+    <?php if (($config['pageHeading'] ?? '') !== ''): ?>
+    <h1><?= htmlspecialchars($config['pageHeading'], ENT_QUOTES, 'UTF-8') ?></h1>
+    <?php endif; ?>
     <p><a href="<?= htmlspecialchars($config['returnUrl'] ?? 'index.php', ENT_QUOTES, 'UTF-8') ?>">Return</a></p>
     <h2><?= htmlspecialchars($config['pageName'] ?? 'Transaction Log', ENT_QUOTES, 'UTF-8') ?></h2>
 
