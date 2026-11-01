@@ -22,6 +22,10 @@ declare(strict_types=1);
  * - bodyClass: optional class attribute for <body> (default: '')
  * - contentClass: optional class for the main content wrapper (default:
  *   'wholepage')
+ * - documentHeader: optional complete document header (doctype + <html> +
+ *   <head>…</head>), echoed verbatim instead of the template's own header.
+ *   Use this when the app already provides a full page head (e.g. Outings'
+ *   $htmlheader) rather than head fragments.
  * - statusOptionText: text for status options (default: ['ok', 'error'])
  * - operationsWhitelist: allowed operations for replay (default: [])
  * - pageJs: additional JS to include (optional)
@@ -45,6 +49,7 @@ $config = array_merge([
     'pageHeading' => '',
     'bodyClass' => '',
     'contentClass' => 'wholepage',
+    'documentHeader' => '',
     'statusOptions' => ['ok', 'error'],
     'operationsWhitelist' => [],
     'pageJs' => '',
@@ -196,6 +201,9 @@ if ($ajaxRows) {
 $operations = $scan->distinctOperations;
 ?>
 
+<?php if (($config['documentHeader'] ?? '') !== ''): ?>
+<?= $config['documentHeader'] ?>
+<?php else: ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -203,11 +211,13 @@ $operations = $scan->distinctOperations;
     <title><?= htmlspecialchars($config['pageName'] ?? 'Transaction Log', ENT_QUOTES, 'UTF-8') ?></title>
     <?php endif; ?>
     <?= $htmlheader ?? '' ?>
-    <script src="js/infinite-query.js"></script>
     <?php if (isset($config['pageJs']) && $config['pageJs']): ?>
         <?= $config['pageJs'] ?>
+    <?php else: ?>
+    <script src="js/infinite-query.js"></script>
     <?php endif; ?>
 </head>
+<?php endif; ?>
 <body<?= ($config['bodyClass'] ?? '') !== '' ? ' class="' . htmlspecialchars($config['bodyClass'], ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
     <?php if ($config['bannerInclude'] && file_exists($config['bannerInclude'])): ?>
         <?php include $config['bannerInclude']; ?>
