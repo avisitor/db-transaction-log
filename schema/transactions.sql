@@ -7,8 +7,10 @@
 -- (configurable, default 1 year) — keep the `ts` index for that delete.
 --
 
-DROP TABLE IF EXISTS `transactions`;
-CREATE TABLE `transactions` (
+-- Re-applying this file must never destroy recorded history, so the table is
+-- created only when missing. Use a deliberate DROP yourself if you really
+-- want to discard the log.
+CREATE TABLE IF NOT EXISTS `transactions` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `ts` datetime NOT NULL,
   `username` varchar(64) DEFAULT NULL,
